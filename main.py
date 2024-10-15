@@ -1,4 +1,4 @@
-from packages import get_framebbox, get_path_list, get_nonframebbox, get_bboxs_inside_frame, plot_bounded_obj_num, draw_bbox_and_show
+from packages import get_framebbox, get_path_list, get_nonframebbox, get_bboxs_inside_frame, plot_bounded_obj_num, draw_bbox_and_show, calc_stats
 
 if __name__ == "__main__":
     bounded_bboxs_num = []
@@ -22,4 +22,10 @@ if __name__ == "__main__":
                 #     print(bouded_nonframe_bboxs)
                 #     print("=================================")
                 #     draw_bbox_and_show.draw_bbox_and_show(path, index, frame_bbox, nonframe_bboxs[index])
+    mode, median, mean, variance, std_dev = calc_stats.calc_stats(bounded_bboxs_num)
+    print("mode: ", mode)
+    print("median: ", median)
+    print("mean: ", mean)
+    print("variance: ", variance)
+    print("std_dev: ", std_dev)
     plot_bounded_obj_num.plot_bounded_obj_num(bounded_bboxs_num, "コマ内のオブジェクト数")
