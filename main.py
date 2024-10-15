@@ -1,4 +1,4 @@
-from packages import get_framebbox, get_path_list, get_nonframebbox, get_bboxs_inside_frame, plot_bounded_obj_num
+from packages import get_framebbox, get_path_list, get_nonframebbox, get_bboxs_inside_frame, plot_bounded_obj_num, draw_bbox_and_show
 
 if __name__ == "__main__":
     bounded_bboxs_num = []
@@ -14,14 +14,12 @@ if __name__ == "__main__":
                 # print(frame_bbox["id"])
                 bouded_nonframe_bboxs = get_bboxs_inside_frame.get_bboxs_inside_frame(frame_bbox, nonframe_bboxs[index])
                 bounded_bboxs_num.append(bouded_nonframe_bboxs.__len__())
-                # print(bouded_nonframe_bboxs.__len__())
-                if len(bouded_nonframe_bboxs) >= 10:
-                    print(path)
-                    print(index)
-                    print(frame_bbox["id"])
-                    print(bouded_nonframe_bboxs.__len__())
-                    print(bouded_nonframe_bboxs)
-                    print("=================================")
-                    break
-    # print(bounded_bboxs_num)
+                # if len(bouded_nonframe_bboxs) == 0:
+                #     print(path)
+                #     print(index)
+                #     print(frame_bbox)
+                #     print(bouded_nonframe_bboxs.__len__())
+                #     print(bouded_nonframe_bboxs)
+                #     print("=================================")
+                #     draw_bbox_and_show.draw_bbox_and_show(path, index, frame_bbox, nonframe_bboxs[index])
     plot_bounded_obj_num.plot_bounded_obj_num(bounded_bboxs_num, "コマ内のオブジェクト数")
