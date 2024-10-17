@@ -3,7 +3,7 @@ import japanize_matplotlib
 import numpy as np
 from collections import Counter
 
-def plot_bounded_obj_num(bouded_obj_num: list, title: str):
+def plot_bounded_obj_num(bouded_obj_num: list, title: str, file_name: str):
     frame_sum = len(bouded_obj_num)
     # 10以上のオブジェクト数を10にまとめる
     processed_data = [10 if x >= 10 else x for x in bouded_obj_num]
@@ -37,5 +37,5 @@ def plot_bounded_obj_num(bouded_obj_num: list, title: str):
 
     # プロットの表示
     plt.tight_layout()
-    plt.savefig('result.png')
+    plt.savefig(f'{file_name}.png')
     plt.show()
