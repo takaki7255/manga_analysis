@@ -10,6 +10,7 @@ from collections import defaultdict, Counter
 def plot_balloon_count_stats(annotations_dir: str, output_dir: str = "./"):
     """
     1画像中の吹き出し個数の統計情報を分析してプロットする
+    （吹き出しがある画像のみを対象とする）
     
     Args:
         annotations_dir: JSONアノテーションファイルがあるディレクトリパス
@@ -54,26 +55,20 @@ def plot_balloon_count_stats(annotations_dir: str, output_dir: str = "./"):
                 # マンガタイトルを取得
                 manga_title = file_name.split("/")[0] if "/" in file_name else "unknown"
     
-    # 画像ごとの吹き出し個数リストを作成
+    # 画像ごとの吹き出し個数リストを作成（吹き出しがある画像のみ）
     for file_name, count in image_balloon_counts.items():
-        manga_title = file_name.split("/")[0] if "/" in file_name else "unknown"
-        manga_balloon_counts[manga_title].append(count)
-        all_counts.append(count)
+        if count > 0:  # 吹き出しがある画像のみ
+            manga_title = file_name.split("/")[0] if "/" in file_name else "unknown"
+            manga_balloon_counts[manga_title].append(count)
+            all_counts.append(count)
     
-    # 吹き出しが0個の画像も含める（全画像を確認）
-    for json_path in json_files:
-        with open(json_path, 'r', encoding='utf-8') as f:
-            data = json.load(f)
-        
-        for img in data['images']:
-            file_name = img['file_name']
-            if file_name not in image_balloon_counts:
-                image_balloon_counts[file_name] = 0
-                manga_title = file_name.split("/")[0] if "/" in file_name else "unknown"
-                manga_balloon_counts[manga_title].append(0)
-                all_counts.append(0)
+    # 統計情報の表示
+    total_images_with_balloons = len(all_counts)
+    total_images = len(image_balloon_counts)
     
-    print(f"Analyzed {len(image_balloon_counts)} images")
+    print(f"Analyzed {total_images} images")
+    print(f"Images with balloons: {total_images_with_balloons}")
+    print(f"Images without balloons: {total_images - total_images_with_balloons}")
     print(f"Total balloon annotations: {sum(all_counts)}")
     
     if len(all_counts) == 0:
@@ -88,7 +83,7 @@ def plot_balloon_count_stats(annotations_dir: str, output_dir: str = "./"):
         
         # 言語別のタイトルとラベル
         if language == 'japanese':
-            fig.suptitle('1画像中の吹き出し個数統計', fontsize=16, fontweight='bold')
+            fig.suptitle('1画像中の吹き出し個数統計（吹き出しがある画像のみ）', fontsize=16, fontweight='bold')
             xlabel_count = '1画像中の吹き出し個数'
             ylabel_frequency = '画像数'
             title_count_dist = '1画像中の吹き出し個数の分布'
@@ -101,7 +96,7 @@ def plot_balloon_count_stats(annotations_dir: str, output_dir: str = "./"):
             mean_label = f'平均: {np.mean(all_counts):.2f}'
             median_label = f'中央値: {np.median(all_counts):.2f}'
         else:
-            fig.suptitle('Balloon Count Statistics per Image', fontsize=16, fontweight='bold')
+            fig.suptitle('Balloon Count Statistics per Image (Images with Balloons Only)', fontsize=16, fontweight='bold')
             xlabel_count = 'Number of Balloons per Image'
             ylabel_frequency = 'Number of Images'
             title_count_dist = 'Distribution of Balloon Count per Image'
@@ -116,7 +111,8 @@ def plot_balloon_count_stats(annotations_dir: str, output_dir: str = "./"):
         
         # 1. 吹き出し個数のヒストグラム
         max_count = max(all_counts) if all_counts else 0
-        bins = range(0, max_count + 2)
+        min_count = min(all_counts) if all_counts else 1
+        bins = range(min_count, max_count + 2)
         axes[0, 0].hist(all_counts, bins=bins, alpha=0.7, color='skyblue', edgecolor='black')
         axes[0, 0].set_xlabel(xlabel_count)
         axes[0, 0].set_ylabel(ylabel_frequency)
@@ -220,12 +216,10 @@ def plot_balloon_count_stats(annotations_dir: str, output_dir: str = "./"):
     # 統計情報をテキストファイルに保存（英語版）
     stats_path = os.path.join(output_dir, 'balloon_count_statistics.txt')
     with open(stats_path, 'w', encoding='utf-8') as f:
-        f.write("Balloon Count Statistics per Image\n")
-        f.write("=" * 50 + "\n")
-        f.write(f"Total images analyzed: {len(all_counts)}\n")
-        f.write(f"Total balloon annotations: {sum(all_counts)}\n")
-        f.write(f"Images with balloons: {sum(1 for count in all_counts if count > 0)}\n")
-        f.write(f"Images without balloons: {sum(1 for count in all_counts if count == 0)}\n\n")
+        f.write("Balloon Count Statistics per Image (Images with Balloons Only)\n")
+        f.write("=" * 65 + "\n")
+        f.write(f"Images with balloons analyzed: {len(all_counts)}\n")
+        f.write(f"Total balloon annotations: {sum(all_counts)}\n\n")
         
         f.write("Balloon Count Statistics:\n")
         f.write(f"Mean: {np.mean(all_counts):.6f}\n")
@@ -256,12 +250,10 @@ def plot_balloon_count_stats(annotations_dir: str, output_dir: str = "./"):
     # 統計情報をテキストファイルに保存（日本語版）
     stats_path_jp = os.path.join(output_dir, 'balloon_count_statistics_jp.txt')
     with open(stats_path_jp, 'w', encoding='utf-8') as f:
-        f.write("1画像中の吹き出し個数統計\n")
-        f.write("=" * 50 + "\n")
-        f.write(f"分析対象画像総数: {len(all_counts)}\n")
-        f.write(f"吹き出しアノテーション総数: {sum(all_counts)}\n")
-        f.write(f"吹き出しがある画像数: {sum(1 for count in all_counts if count > 0)}\n")
-        f.write(f"吹き出しがない画像数: {sum(1 for count in all_counts if count == 0)}\n\n")
+        f.write("1画像中の吹き出し個数統計（吹き出しがある画像のみ）\n")
+        f.write("=" * 65 + "\n")
+        f.write(f"吹き出しがある画像数: {len(all_counts)}\n")
+        f.write(f"吹き出しアノテーション総数: {sum(all_counts)}\n\n")
         
         f.write("吹き出し個数統計:\n")
         f.write(f"平均: {np.mean(all_counts):.6f}\n")
@@ -289,13 +281,14 @@ def plot_balloon_count_stats(annotations_dir: str, output_dir: str = "./"):
     
     print(f"Japanese statistics saved to: {stats_path_jp}")
     
-    # 詳細なCSVファイルも出力
+    # 詳細なCSVファイルも出力（吹き出しがある画像のみ）
     csv_path = os.path.join(output_dir, 'balloon_count_per_image.csv')
     with open(csv_path, 'w', encoding='utf-8') as f:
         f.write("manga_title,image_filename,balloon_count\n")
         for filename, count in sorted(image_balloon_counts.items()):
-            manga_title = filename.split("/")[0] if "/" in filename else "unknown"
-            f.write(f"{manga_title},{filename},{count}\n")
+            if count > 0:  # 吹き出しがある画像のみ
+                manga_title = filename.split("/")[0] if "/" in filename else "unknown"
+                f.write(f"{manga_title},{filename},{count}\n")
     
     print(f"Detailed CSV saved to: {csv_path}")
     

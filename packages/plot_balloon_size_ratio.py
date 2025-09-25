@@ -10,37 +10,56 @@ from pycocotools import mask as maskUtils
 def plot_balloon_size_ratio(annotations_dir: str, output_dir: str = "./"):
     """
     吹き出し領域のサイズと画像全体のサイズの比をプロットする
+    （吹き出しがある画像のみを対象とする）
     
     Args:
         annotations_dir: JSONアノテーションファイルがあるディレクトリパス
         output_dir: グラフの保存先ディレクトリ
     """
-    # 画像サイズ（固定）
-    IMAGE_WIDTH = 1654
-    IMAGE_HEIGHT = 1170
-    IMAGE_AREA = IMAGE_WIDTH * IMAGE_HEIGHT
     
     # 吹き出しサイズの比率を格納するリスト
     balloon_ratios = []
     balloon_areas = []
     manga_titles = []
     
+    # 画像情報を格納する辞書
+    image_info = {}
+    images_with_balloons = []
+    
     # JSONファイルを取得
     json_files = glob.glob(os.path.join(annotations_dir, "*.json"))
     
     print(f"Found {len(json_files)} JSON files")
     
+    # 最初に全画像情報を収集
     for json_path in json_files:
         print(f"Processing: {os.path.basename(json_path)}")
         
         with open(json_path, 'r', encoding='utf-8') as f:
             data = json.load(f)
         
+        # 画像情報を収集
+        for img in data['images']:
+            image_id = img['id']
+            file_name = img['file_name']
+            width = img['width']
+            height = img['height']
+            
+            image_info[image_id] = {
+                'file_name': file_name,
+                'width': width,
+                'height': height,
+                'area': width * height,
+                'balloon_count': 0
+            }
+    
+    # 次に吹き出しアノテーションを処理
+    for json_path in json_files:
+        with open(json_path, 'r', encoding='utf-8') as f:
+            data = json.load(f)
+        
         # カテゴリID → クラス名のマッピング
         category_map = {cat['id']: cat['name'] for cat in data.get("categories", [])}
-        
-        # 画像ID → ファイル名のマッピング
-        id_to_filename = {img['id']: img['file_name'] for img in data['images']}
         
         # 各アノテーションを処理
         for ann in data['annotations']:
@@ -49,30 +68,43 @@ def plot_balloon_size_ratio(annotations_dir: str, output_dir: str = "./"):
             
             # 吹き出し（balloon）クラスのみを対象とする
             if 'balloon' in class_name.lower() or 'speech' in class_name.lower():
-                segmentation = ann['segmentation']
-                
-                # RLEデコードしてマスクを取得
-                mask = maskUtils.decode(segmentation)
-                if len(mask.shape) == 3:
-                    mask = np.any(mask, axis=2).astype(np.uint8)
-                
-                # 吹き出し領域のピクセル数を計算
-                balloon_area = np.sum(mask)
-                
-                # 画像全体に対する比率を計算
-                ratio = balloon_area / IMAGE_AREA
-                
-                # データを保存
-                balloon_ratios.append(ratio)
-                balloon_areas.append(balloon_area)
-                
-                # マンガタイトルを取得
                 image_id = ann['image_id']
-                file_name = id_to_filename[image_id]
-                manga_title = file_name.split("/")[0] if "/" in file_name else "unknown"
-                manga_titles.append(manga_title)
+                
+                if image_id in image_info:
+                    img_info = image_info[image_id]
+                    
+                    # 吹き出しカウント
+                    img_info['balloon_count'] += 1
+                    
+                    segmentation = ann['segmentation']
+                    
+                    # RLEデコードしてマスクを取得
+                    mask = maskUtils.decode(segmentation)
+                    if len(mask.shape) == 3:
+                        mask = np.any(mask, axis=2).astype(np.uint8)
+                    
+                    # 吹き出し領域のピクセル数を計算
+                    balloon_area = np.sum(mask)
+                    
+                    # 実際の画像サイズに対する比率を計算
+                    ratio = balloon_area / img_info['area']
+                    
+                    # データを保存
+                    balloon_ratios.append(ratio)
+                    balloon_areas.append(balloon_area)
+                    
+                    # マンガタイトルを取得
+                    file_name = img_info['file_name']
+                    manga_title = file_name.split("/")[0] if "/" in file_name else "unknown"
+                    manga_titles.append(manga_title)
+    
+    # 吹き出しがある画像を抽出
+    images_with_balloons = [info for info in image_info.values() if info['balloon_count'] > 0]
     
     print(f"Found {len(balloon_ratios)} balloon annotations")
+    print(f"Total images: {len(image_info)}")
+    print(f"Images with balloons: {len(images_with_balloons)}")
+    print(f"Images without balloons: {len(image_info) - len(images_with_balloons)}")
     
     if len(balloon_ratios) == 0:
         print("No balloon annotations found!")
@@ -203,11 +235,10 @@ def plot_balloon_size_ratio(annotations_dir: str, output_dir: str = "./"):
     # 統計情報をテキストファイルに保存（英語版）
     stats_path = os.path.join(output_dir, 'balloon_size_statistics.txt')
     with open(stats_path, 'w', encoding='utf-8') as f:
-        f.write("Balloon Size Ratio Statistics\n")
-        f.write("=" * 40 + "\n")
+        f.write("Balloon Size Ratio Statistics (Images with Balloons Only)\n")
+        f.write("=" * 60 + "\n")
         f.write(f"Total balloon annotations: {len(balloon_ratios)}\n")
-        f.write(f"Image size: {IMAGE_WIDTH} x {IMAGE_HEIGHT} pixels\n")
-        f.write(f"Total image area: {IMAGE_AREA:,} pixels\n\n")
+        f.write(f"Images with balloons: {len(images_with_balloons)}\n\n")
         
         f.write("Ratio Statistics:\n")
         f.write(f"Mean: {np.mean(balloon_ratios):.6f}\n")
@@ -230,11 +261,10 @@ def plot_balloon_size_ratio(annotations_dir: str, output_dir: str = "./"):
     # 統計情報をテキストファイルに保存（日本語版）
     stats_path_jp = os.path.join(output_dir, 'balloon_size_statistics_jp.txt')
     with open(stats_path_jp, 'w', encoding='utf-8') as f:
-        f.write("吹き出しサイズ比率統計\n")
-        f.write("=" * 40 + "\n")
+        f.write("吹き出しサイズ比率統計（吹き出しがある画像のみ）\n")
+        f.write("=" * 60 + "\n")
         f.write(f"吹き出しアノテーション総数: {len(balloon_ratios)}\n")
-        f.write(f"画像サイズ: {IMAGE_WIDTH} x {IMAGE_HEIGHT} ピクセル\n")
-        f.write(f"画像総面積: {IMAGE_AREA:,} ピクセル\n\n")
+        f.write(f"吹き出しがある画像数: {len(images_with_balloons)}\n\n")
         
         f.write("比率統計:\n")
         f.write(f"平均: {np.mean(balloon_ratios):.6f}\n")

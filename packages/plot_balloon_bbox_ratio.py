@@ -9,15 +9,12 @@ import seaborn as sns
 def plot_balloon_bbox_ratio(annotations_dir: str, output_dir: str = "./"):
     """
     吹き出し領域のバウンディングボックスサイズと画像全体のサイズの比をプロットする
+    （吹き出しがある画像のみを対象とする）
     
     Args:
         annotations_dir: JSONアノテーションファイルがあるディレクトリパス
         output_dir: グラフの保存先ディレクトリ
     """
-    # 画像サイズ（固定）
-    IMAGE_WIDTH = 1654
-    IMAGE_HEIGHT = 1170
-    IMAGE_AREA = IMAGE_WIDTH * IMAGE_HEIGHT
     
     # バウンディングボックスサイズの比率を格納するリスト
     bbox_ratios = []
@@ -28,22 +25,44 @@ def plot_balloon_bbox_ratio(annotations_dir: str, output_dir: str = "./"):
     height_ratios = []
     manga_titles = []
     
+    # 画像情報を格納する辞書
+    image_info = {}
+    images_with_balloons = []
+    
     # JSONファイルを取得
     json_files = glob.glob(os.path.join(annotations_dir, "*.json"))
     
     print(f"Found {len(json_files)} JSON files")
     
+    # 最初に全画像情報を収集
     for json_path in json_files:
         print(f"Processing: {os.path.basename(json_path)}")
         
         with open(json_path, 'r', encoding='utf-8') as f:
             data = json.load(f)
         
+        # 画像情報を収集
+        for img in data['images']:
+            image_id = img['id']
+            file_name = img['file_name']
+            width = img['width']
+            height = img['height']
+            
+            image_info[image_id] = {
+                'file_name': file_name,
+                'width': width,
+                'height': height,
+                'area': width * height,
+                'balloon_count': 0
+            }
+    
+    # 次に吹き出しアノテーションを処理
+    for json_path in json_files:
+        with open(json_path, 'r', encoding='utf-8') as f:
+            data = json.load(f)
+        
         # カテゴリID → クラス名のマッピング
         category_map = {cat['id']: cat['name'] for cat in data.get("categories", [])}
-        
-        # 画像ID → ファイル名のマッピング
-        id_to_filename = {img['id']: img['file_name'] for img in data['images']}
         
         # 各アノテーションを処理
         for ann in data['annotations']:
@@ -52,33 +71,51 @@ def plot_balloon_bbox_ratio(annotations_dir: str, output_dir: str = "./"):
             
             # 吹き出し（balloon）クラスのみを対象とする
             if 'balloon' in class_name.lower() or 'speech' in class_name.lower():
-                # バウンディングボックス情報を取得 [x, y, width, height]
-                bbox = ann['bbox']
-                x, y, width, height = bbox
-                
-                # バウンディングボックス面積を計算
-                bbox_area = width * height
-                
-                # 画像全体に対する比率を計算
-                area_ratio = bbox_area / IMAGE_AREA
-                width_ratio = width / IMAGE_WIDTH
-                height_ratio = height / IMAGE_HEIGHT
-                
-                # データを保存
-                bbox_ratios.append(area_ratio)
-                bbox_areas.append(bbox_area)
-                bbox_widths.append(width)
-                bbox_heights.append(height)
-                width_ratios.append(width_ratio)
-                height_ratios.append(height_ratio)
-                
-                # マンガタイトルを取得
                 image_id = ann['image_id']
-                file_name = id_to_filename[image_id]
-                manga_title = file_name.split("/")[0] if "/" in file_name else "unknown"
-                manga_titles.append(manga_title)
+                
+                if image_id in image_info:
+                    img_info = image_info[image_id]
+                    
+                    # 吹き出しカウント
+                    img_info['balloon_count'] += 1
+                    
+                    # バウンディングボックス情報を取得 [x, y, width, height]
+                    bbox = ann['bbox']
+                    x, y, width, height = bbox
+                    
+                    # バウンディングボックス面積を計算
+                    bbox_area = width * height
+                    
+                    # 実際の画像サイズに対する比率を計算
+                    area_ratio = bbox_area / img_info['area']
+                    width_ratio = width / img_info['width']
+                    height_ratio = height / img_info['height']
+                    
+                    # データを保存
+                    bbox_ratios.append(area_ratio)
+                    bbox_areas.append(bbox_area)
+                    bbox_widths.append(width)
+                    bbox_heights.append(height)
+                    width_ratios.append(width_ratio)
+                    height_ratios.append(height_ratio)
+                    
+                    # マンガタイトルを取得
+                    file_name = img_info['file_name']
+                    manga_title = file_name.split("/")[0] if "/" in file_name else "unknown"
+                    manga_titles.append(manga_title)
+    
+    # 吹き出しがある画像を抽出
+    images_with_balloons = [info for info in image_info.values() if info['balloon_count'] > 0]
     
     print(f"Found {len(bbox_ratios)} balloon bounding box annotations")
+    print(f"Total images: {len(image_info)}")
+    print(f"Images with balloons: {len(images_with_balloons)}")
+    print(f"Images without balloons: {len(image_info) - len(images_with_balloons)}")
+    
+    # 画像サイズの統計
+    image_sizes = [(info['width'], info['height']) for info in images_with_balloons]
+    unique_sizes = list(set(image_sizes))
+    print(f"Unique image sizes (with balloons): {len(unique_sizes)}")
     
     if len(bbox_ratios) == 0:
         print("No balloon annotations found!")
@@ -216,11 +253,11 @@ def plot_balloon_bbox_ratio(annotations_dir: str, output_dir: str = "./"):
     # 統計情報をテキストファイルに保存（英語版）
     stats_path = os.path.join(output_dir, 'balloon_bbox_statistics.txt')
     with open(stats_path, 'w', encoding='utf-8') as f:
-        f.write("Balloon Bounding Box Size Ratio Statistics\n")
-        f.write("=" * 50 + "\n")
+        f.write("Balloon Bounding Box Size Ratio Statistics (Images with Balloons Only)\n")
+        f.write("=" * 70 + "\n")
         f.write(f"Total balloon annotations: {len(bbox_ratios)}\n")
-        f.write(f"Image size: {IMAGE_WIDTH} x {IMAGE_HEIGHT} pixels\n")
-        f.write(f"Total image area: {IMAGE_AREA:,} pixels\n\n")
+        f.write(f"Images with balloons: {len(images_with_balloons)}\n")
+        f.write(f"Unique image sizes: {len(unique_sizes)}\n\n")
         
         f.write("Area Ratio Statistics:\n")
         f.write(f"Mean: {np.mean(bbox_ratios):.6f}\n")
@@ -268,18 +305,31 @@ def plot_balloon_bbox_ratio(annotations_dir: str, output_dir: str = "./"):
         f.write(f"Median: {np.median(bbox_heights):.2f}\n")
         f.write(f"Standard deviation: {np.std(bbox_heights):.2f}\n")
         f.write(f"Min: {np.min(bbox_heights):.2f}\n")
-        f.write(f"Max: {np.max(bbox_heights):.2f}\n")
+        f.write(f"Max: {np.max(bbox_heights):.2f}\n\n")
+        
+        f.write("Image Size Distribution (Images with Balloons):\n")
+        image_sizes = [(info['width'], info['height']) for info in images_with_balloons]
+        size_counts = {}
+        for size in image_sizes:
+            if size in size_counts:
+                size_counts[size] += 1
+            else:
+                size_counts[size] = 1
+        
+        sorted_sizes = sorted(size_counts.items(), key=lambda x: x[1], reverse=True)[:10]
+        for size, count in sorted_sizes:
+            f.write(f"{size[0]}x{size[1]}: {count} images\n")
     
     print(f"Statistics saved to: {stats_path}")
     
     # 統計情報をテキストファイルに保存（日本語版）
     stats_path_jp = os.path.join(output_dir, 'balloon_bbox_statistics_jp.txt')
     with open(stats_path_jp, 'w', encoding='utf-8') as f:
-        f.write("吹き出しバウンディングボックスサイズ比率統計\n")
-        f.write("=" * 50 + "\n")
+        f.write("吹き出しバウンディングボックスサイズ比率統計（吹き出しがある画像のみ）\n")
+        f.write("=" * 70 + "\n")
         f.write(f"吹き出しアノテーション総数: {len(bbox_ratios)}\n")
-        f.write(f"画像サイズ: {IMAGE_WIDTH} x {IMAGE_HEIGHT} ピクセル\n")
-        f.write(f"画像総面積: {IMAGE_AREA:,} ピクセル\n\n")
+        f.write(f"吹き出しがある画像数: {len(images_with_balloons)}\n")
+        f.write(f"ユニークな画像サイズ数: {len(unique_sizes)}\n\n")
         
         f.write("面積比率統計:\n")
         f.write(f"平均: {np.mean(bbox_ratios):.6f}\n")
@@ -327,7 +377,11 @@ def plot_balloon_bbox_ratio(annotations_dir: str, output_dir: str = "./"):
         f.write(f"中央値: {np.median(bbox_heights):.2f}\n")
         f.write(f"標準偏差: {np.std(bbox_heights):.2f}\n")
         f.write(f"最小値: {np.min(bbox_heights):.2f}\n")
-        f.write(f"最大値: {np.max(bbox_heights):.2f}\n")
+        f.write(f"最大値: {np.max(bbox_heights):.2f}\n\n")
+        
+        f.write("画像サイズ分布（吹き出しがある画像）:\n")
+        for size, count in sorted_sizes:
+            f.write(f"{size[0]}x{size[1]}: {count}枚\n")
     
     print(f"Japanese statistics saved to: {stats_path_jp}")
     
