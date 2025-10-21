@@ -100,7 +100,7 @@ def plot_onomatopoeia_body_stats(annotations_dir: str, output_dir: str = "./"):
             img_info = image_info[image_id]
             
             # オノマトペ (id=6, onomatopoeia) の処理
-            if category_id == 6 and 'onomatopoeia' in class_name.lower():
+            if category_id == 6:
                 stats['onomatopoeia']['total_annotations'] += 1
                 img_info['onomatopoeia_count'] += 1
                 
@@ -136,7 +136,7 @@ def plot_onomatopoeia_body_stats(annotations_dir: str, output_dir: str = "./"):
                 stats['onomatopoeia']['manga_titles'].append(manga_title)
             
             # キャラクター（body） (id=4, body) の処理
-            elif category_id == 4 and 'body' in class_name.lower():
+            elif category_id == 4:
                 stats['body']['total_annotations'] += 1
                 img_info['body_count'] += 1
                 
