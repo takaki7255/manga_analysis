@@ -21,7 +21,7 @@ def main():
     
     # アノテーションディレクトリのパス
     annotations_dir = "./../annotations/"  # JSONファイルがあるディレクトリ
-    output_dir = "./"  # 結果の保存先
+    output_dir = "./statistics/"  # 結果の保存先
     
     # ディレクトリが存在するかチェック
     if not os.path.exists(annotations_dir):
